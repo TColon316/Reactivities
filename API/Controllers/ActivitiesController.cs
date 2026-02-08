@@ -19,7 +19,7 @@ namespace API.Controllers
         {
             var activity = await context.Activities.FindAsync(id);
 
-            if (activity == null) return NotFound();
+            if (activity == null) return NotFound(); 
 
             return activity;
         }
