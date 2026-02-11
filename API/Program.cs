@@ -1,3 +1,5 @@
+using Application.Core;
+using Domain.Activities.Queries;
 using Microsoft.EntityFrameworkCore;
 using Persistence;
 
@@ -5,6 +7,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddMediatR(x => x.RegisterServicesFromAssemblyContaining<GetActivityList.Handler>());
+builder.Services.AddAutoMapper(typeof(MappingProfiles).Assembly);
 
 // Add DbContext to the container
 builder.Services.AddDbContext<AppDbContext>(options =>

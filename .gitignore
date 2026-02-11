@@ -483,3 +483,5 @@ $RECYCLE.BIN/
 API/appsettings.json
 .vscode/launch.json
 API/reactivities.db
+API/reactivities.db-shm
+API/reactivities.db-wal
