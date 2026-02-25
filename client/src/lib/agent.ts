@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { store } from './stores/store';
 
 const sleep = (delay: number) => {
   return new Promise((resolve) => {
@@ -10,6 +11,14 @@ const agent = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
 });
 
+// This is what happens when our request is on its way out
+agent.interceptors.request.use((config) => {
+  store.uiStore.isBusy();
+
+  return config;
+});
+
+// This is what happens when our request is on its way back
 agent.interceptors.response.use(async (response) => {
   try {
     await sleep(1000);
@@ -17,6 +26,8 @@ agent.interceptors.response.use(async (response) => {
   } catch (error) {
     console.log(error);
     return Promise.reject(error);
+  } finally {
+    store.uiStore.isIdle();
   }
 });
 
