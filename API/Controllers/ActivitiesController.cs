@@ -4,7 +4,6 @@ using Application.Activities.DTOs;
 using Application.Activities.Queries;
 using Domain;
 using Domain.Activities.Queries;
-using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers

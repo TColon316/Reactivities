@@ -1,19 +1,33 @@
 using API.Middleware;
 using Application.Activities.Validators;
 using Application.Core;
+using Domain;
 using Domain.Activities.Queries;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers(option =>
+{
+  var policy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+  option.Filters.Add(new AuthorizeFilter(policy));
+});
 builder.Services.AddMediatR(x => x.RegisterServicesFromAssemblyContaining<GetActivityList.Handler>());
 builder.Services.AddAutoMapper(typeof(MappingProfiles).Assembly);
 builder.Services.AddValidatorsFromAssemblyContaining<CreateActivityValidator>();
 builder.Services.AddTransient<ExceptionMiddleware>();
+builder.Services.AddIdentityApiEndpoints<User>(options =>
+{
+  options.User.RequireUniqueEmail = true;
+})
+.AddRoles<IdentityRole>()
+.AddEntityFrameworkStores<AppDbContext>();
 
 // Add DbContext to the container
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -32,11 +46,16 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseCors(x => x
-  .AllowAnyHeader()
-  .AllowAnyMethod()
-  .WithOrigins("http://localhost:3000", "https://localhost:3000"));
+  .AllowCredentials() // Allow cookies to be sent with the request
+  .AllowAnyHeader() // Allow all headers to be sent with the request
+  .AllowAnyMethod() // Allow all methods to be used with the request
+  .WithOrigins("http://localhost:3000", "https://localhost:3000")); // Allow requests from these origins
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
+app.MapGroup("api").MapIdentityApi<User>(); // api/login
 
 using var scope = app.Services.CreateScope();
 var services = scope.ServiceProvider;
@@ -44,8 +63,9 @@ var services = scope.ServiceProvider;
 try
 {
   var context = services.GetRequiredService<AppDbContext>();
+  var userManager = services.GetRequiredService<UserManager<User>>();
   await context.Database.MigrateAsync();
-  await DbInitializer.SeedData(context);
+  await DbInitializer.SeedData(context, userManager);
 }
 catch (Exception ex)
 {

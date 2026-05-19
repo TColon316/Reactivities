@@ -1,43 +1,63 @@
-import { Box, Button, Paper, TextField, Typography } from '@mui/material';
+import { Box, Button, Paper, Typography } from '@mui/material';
 import { useActivities } from '../../../lib/hooks/useActivities';
-import type { FormEvent } from 'react';
+import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router';
+import { useEffect } from 'react';
+import {
+  activitySchema,
+  type ActivityFormValues,
+  type ActivitySchema,
+} from '../../../lib/schemas/activitySchema';
+import { zodResolver } from '@hookform/resolvers/zod';
+import TextInput from '../../../app/shared/components/TextInput';
+import SelectInput from '../../../app/shared/components/SelectInput';
+import { categoryOptions } from './categoryOptions';
+import DateTimeInput from '../../../app/shared/components/DateTimeInput';
+import LocationInput from '../../../app/shared/components/LocationInput';
 
 export default function ActivityForm() {
+  const { control, handleSubmit, reset } = useForm<
+    ActivityFormValues,
+    unknown,
+    ActivitySchema
+  >({
+    mode: 'onTouched',
+    resolver: zodResolver(activitySchema),
+  });
+
+  const navigate = useNavigate();
   const { id } = useParams();
   const { activity, createActivity, isLoadingActivity, updateActivity } =
     useActivities(id);
-  const navigate = useNavigate();
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    // Get the Form Data
-    const formData = new FormData(event.currentTarget);
-
-    // Convert the Form Data to an unknown Object (to be cast later to an Activity)
-    const data: { [key: string]: FormDataEntryValue } = {};
-    formData.forEach((value, key) => {
-      data[key] = value;
+  useEffect(() => {
+    if (activity) reset({
+      ...activity,
+      location: {
+        city: activity.city,
+        venue: activity.venue,
+        latitude: activity.latitude,
+        longitude: activity.longitude,
+      }
     });
+  }, [activity, reset]);
 
-    // If an Activity is provided, update it otherwise create a new Activity
-    if (activity) {
-      // The Activity should have an id, so we need to set it on the "unknown" data object
-      data.id = activity.id;
+  const onSubmit = async (data: ActivitySchema) => {
+    const {location, ...rest} = data;
+    const flattenedData = { ...rest, ...location };
 
-      // Cast the "unknown" data object to an Activity and then pass it to the UpdateActivity method to Update the Activity
-      await updateActivity.mutateAsync(data as unknown as Activity);
-
-      // Navigate to the Activity Details page
-      navigate(`/activities/${activity.id}`);
-    } else {
-      // Cast the "unknown" data object to an Activity and then pass it to the CreateActivity method to Create the new Activity
-      createActivity.mutate(data as unknown as Activity, {
-        onSuccess: (id) => {
-          navigate(`/activities/${id}`);
-        },
-      });
+    try {
+      if (activity) {
+        updateActivity.mutate({ ...activity, ...flattenedData }, {
+          onSuccess: () => navigate(`/activities/${activity.id}`),
+        })
+      } else {
+        createActivity.mutate(flattenedData, {
+          onSuccess: (id) => navigate(`/activities/${id}`),
+        })
+      }
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -48,45 +68,46 @@ export default function ActivityForm() {
       <Typography variant="h5" gutterBottom color="primary">
         {activity ? 'Edit Activity' : 'Create Activity'}
       </Typography>
+
       <Box
         component="form"
-        onSubmit={handleSubmit}
+        onSubmit={handleSubmit(onSubmit)}
         display="flex"
         flexDirection="column"
         gap={3}
       >
-        <TextField name="title" label="Title" defaultValue={activity?.title} />
-        <TextField
-          name="description"
+        <TextInput control={control} label="Title" name="title" />
+        <TextInput
+          control={control}
           label="Description"
-          defaultValue={activity?.description}
           multiline
+          name="description"
           rows={3}
         />
-        <TextField
-          name="category"
-          label="Category"
-          defaultValue={activity?.category}
+
+        <Box display="flex" gap={3}>
+          <SelectInput
+            control={control}
+            items={categoryOptions}
+            label="Category"
+            name="category"
+          />
+          <DateTimeInput control={control} label="Date" name="date" />
+        </Box>
+
+        <LocationInput
+          control={control}
+          label="Enter the Location"
+          name="location"
         />
-        <TextField
-          name="date"
-          label="Date"
-          defaultValue={
-            activity?.date
-              ? new Date(activity.date).toISOString().split('T')[0]
-              : new Date().toISOString().split('T')[0]
-          }
-          type="date"
-        />
-        <TextField name="city" label="City" defaultValue={activity?.city} />
-        <TextField name="venue" label="Venue" defaultValue={activity?.venue} />
+
         <Box display="flex" justifyContent="end" gap={3}>
           <Button color="inherit">Cancel</Button>
           <Button
             color="success"
+            disabled={createActivity.isPending || updateActivity.isPending}
             type="submit"
             variant="contained"
-            disabled={createActivity.isPending || updateActivity.isPending}
           >
             Submit
           </Button>
